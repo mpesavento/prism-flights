@@ -20,9 +20,22 @@ DATA = os.path.abspath(os.environ.get('FLIGHTS_DATA') or os.path.join(ROOT, 'dat
 TRIP_DIR = re.compile(r'^\d{2}-\d{2}-\d{2}-[a-z0-9-]+$')   # a built trip folder; nothing else is ever removed
 rd = lambda p: open(p).read()
 load = lambda p, d=None: json.load(open(p)) if os.path.exists(p) else d
-LOGOS = load(os.path.join(SRC, 'logos.json'), {})   # optional airline logo images; without it pages show letter tiles
+LOGOS = load(os.path.join(SRC, 'logos.json'), {})   # optional airline logo images (name -> image URL)
+# Without logos.json, logos load from Google's hosted airline logo images (the ones Google Flights uses) and bank favicons;
+# set "hosted_logos": false in config.local.json to keep pages free of outside requests (they then show short codes).
+IATA = {'Southwest': 'WN', 'Delta': 'DL', 'American': 'AA', 'United': 'UA', 'Alaska': 'AS', 'Hawaiian': 'HA', 'JetBlue': 'B6', 'Frontier': 'F9',
+        'Spirit': 'NK', 'Sun Country': 'SY', 'Allegiant': 'G4', 'Breeze': 'MX', 'Air Canada': 'AC', 'WestJet': 'WS', 'Aeromexico': 'AM',
+        'Korean Air': 'KE', 'Asiana Airlines': 'OZ', 'ANA': 'NH', 'JAL': 'JL', 'Japan Airlines': 'JL', 'Singapore Airlines': 'SQ', 'Cathay Pacific': 'CX',
+        'EVA Air': 'BR', 'China Airlines': 'CI', 'Starlux Airlines': 'JX', 'Philippine Airlines': 'PR', 'Vietnam Airlines': 'VN', 'VietJet Air': 'VJ',
+        'Thai Airways': 'TG', 'China Southern Airlines': 'CZ', 'China Eastern Airlines': 'MU', 'Air China': 'CA', 'Qantas': 'QF', 'Air New Zealand': 'NZ',
+        'Emirates': 'EK', 'Etihad Airways': 'EY', 'Qatar Airways': 'QR', 'Turkish Airlines': 'TK', 'Lufthansa': 'LH', 'British Airways': 'BA',
+        'Air France': 'AF', 'KLM': 'KL', 'Iberia': 'IB', 'Aer Lingus': 'EI', 'Virgin Atlantic': 'VS', 'TAP Air Portugal': 'TP', 'Aegean Airlines': 'A3'}
+BANKS = {'Chase': 'chase.com', 'Amex': 'americanexpress.com', 'Citi': 'citi.com', 'Capital One': 'capitalone.com', 'Bilt': 'biltrewards.com'}
+if not LOGOS and portal_config.get('hosted_logos', True):
+    LOGOS = {**{n: f'https://www.gstatic.com/flights/airline_logos/70px/{c}.png' for n, c in IATA.items()},
+             **{n: f'https://www.google.com/s2/favicons?domain={d}&sz=64' for n, d in BANKS.items()}}
 CSS, COMMON = rd(os.path.join(UI, 'base.css')), rd(os.path.join(UI, 'common.js'))
-LOGOCSS = ''.join('.L-%s{background-image:url(%s)}\n' % (k, v) for k, v in LOGOS.items())
+LOGOCSS = ''.join('.L-%s{background-image:url("%s")}\n' % (re.sub(r'[^A-Za-z0-9]', '', k), v) for k, v in LOGOS.items())   # class names: letters and digits only
 CITY = {"ATL": "Atlanta", "AUS": "Austin", "BNA": "Nashville", "CLT": "Charlotte", "DAL": "Dallas Love Field", "DEN": "Denver", "DFW": "Dallas Fort Worth", "EWR": "Newark", "HOU": "Houston Hobby", "IAD": "Washington Dulles", "IAH": "Houston Bush", "LAS": "Las Vegas", "LAX": "Los Angeles", "MDW": "Chicago Midway", "MSP": "Minneapolis", "ORD": "Chicago O'Hare", "PHX": "Phoenix", "SAN": "San Diego", "SEA": "Seattle", "SFO": "San Francisco", "SLC": "Salt Lake City", "PDX": "Portland", "BWI": "Baltimore", "MCO": "Orlando", "JFK": "New York JFK", "LGA": "New York LaGuardia", "BOS": "Boston", "PHL": "Philadelphia", "DTW": "Detroit", "ONT": "Ontario", "BUR": "Burbank", "SNA": "Orange County", "SMF": "Sacramento", "LGB": "Long Beach", "STL": "St. Louis", "MCI": "Kansas City", "MSY": "New Orleans", "TPA": "Tampa", "RDU": "Raleigh-Durham", "PIT": "Pittsburgh", "CVG": "Cincinnati", "IND": "Indianapolis", "CMH": "Columbus", "SAT": "San Antonio", "ELP": "El Paso", "ABQ": "Albuquerque", "OKC": "Oklahoma City", "MEM": "Memphis", "BHM": "Birmingham", "JAX": "Jacksonville", "RSW": "Fort Myers", "SJU": "San Juan", "ORF": "Norfolk", "CLE": "Cleveland", "MKE": "Milwaukee", "OAK": "Oakland", "SJC": "San Jose"}
 PROGS = {'dl': ([13], 'DL'), 'sw': ([14, 15], 'WN'), 'aa': ([16], 'AA'), 'ua': ([17], 'UA')}
 BAL_KEY = {'Delta': 'dl', 'Southwest': 'sw', 'American': 'aa', 'United': 'ua', 'Alaska': 'as',

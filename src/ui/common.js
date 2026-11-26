@@ -16,10 +16,15 @@ function likeHide(id, liked, hidden) {
   return '<span class="lh"><button class="star' + (liked ? " on" : "") + '" data-like="' + esc(id) + '" aria-pressed="' + liked + '" aria-label="' + (liked ? "Unlike" : "Like") + '">' + (liked ? ICON.star : ICON.starO) + '</button>' +
     '<button class="hide' + (hidden ? " on" : "") + '" data-hide="' + esc(id) + '" aria-pressed="' + hidden + '" aria-label="' + (hidden ? "Unhide" : "Hide") + '">' + ICON.eyeOff + '</button></span>';
 }
+const TILE_CODE = {Southwest: "WN", Delta: "DL", American: "AA", United: "UA", Alaska: "AS", Hawaiian: "HA", JetBlue: "B6", Frontier: "F9", Spirit: "NK", Chase: "UR", Amex: "MR", Citi: "TY", "Capital One": "C1", Bilt: "BT"};
+const logoCls = n => String(n).replace(/[^A-Za-z0-9]/g, "");   // matches the .L-<name> classes the build writes
 function logoTile(al, sm) {
   const a = String(al || "").split("/").filter(x => LOGOS.has(x));
-  if (!a.length) return '<div class="tile' + (sm ? " sm" : "") + '"></div>';
-  return '<div class="tile ' + (a.length > 1 ? "two" : "one") + (sm ? " sm" : "") + '" title="' + esc(al.replace("/", " and ")) + '">' + a.slice(0, 2).map(x => '<span class="li L-' + x + '" role="img" aria-label="' + esc(x) + '"></span>').join("") + "</div>";
+  if (!a.length) {   // no logo image for it (logos.json is optional): show a short code instead of a blank circle
+    const nm = String(al || "").split("/")[0], code = TILE_CODE[nm] || nm.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase();
+    return '<div class="tile txt' + (sm ? " sm" : "") + '" title="' + esc(String(al || "").replace("/", " and ")) + '"><span>' + esc(code) + "</span></div>";
+  }
+  return '<div class="tile ' + (a.length > 1 ? "two" : "one") + (sm ? " sm" : "") + '" title="' + esc(al.replace("/", " and ")) + '">' + a.slice(0, 2).map(x => '<span class="li L-' + logoCls(x) + '" role="img" aria-label="' + esc(x) + '"></span>').join("") + "</div>";
 }
 // Likes and hides: saved through the portal service (all devices), cached in localStorage
 const Store = {

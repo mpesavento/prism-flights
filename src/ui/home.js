@@ -140,7 +140,7 @@ function renderTimeline() {
   for (const g of gs) {
     const y = cy(g), keys = g.list.map(c => c.key).join(" "), aria = g.airline + " " + g.label + ", " + (g.list[0].useByLabel || "use by") + " " + fmtD(g.date);
     h += '<button class="xm z-' + g.z + (g.fl ? " fl" : "") + '" style="left:' + Math.round(g.L + 4) + "px;top:" + Math.round(y - g.d / 2) + 'px" data-go="' + esc(keys) + '" data-tiph="' + esc(g.tip) + '" aria-label="' + esc(aria) + '">' +
-      '<span class="xd' + (g.solid ? "" : " dash") + '" style="width:' + g.d + "px;height:" + g.d + 'px">' + (LOGOS.has(g.airline) ? '<span class="li L-' + esc(g.airline) + '"></span>' : "") + '</span><span class="xl">' + esc(g.label) + "</span></button>";
+      '<span class="xd' + (g.solid ? "" : " dash") + '" style="width:' + g.d + "px;height:" + g.d + 'px">' + (LOGOS.has(g.airline) ? '<span class="li L-' + logoCls(g.airline) + '"></span>' : "") + '</span><span class="xl">' + esc(g.label) + "</span></button>";
   }
   host.innerHTML = h + "</div>";
 }
