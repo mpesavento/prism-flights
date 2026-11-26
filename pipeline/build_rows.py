@@ -40,7 +40,7 @@ for x in its:
     lays = [] if x['lay'] in ('', 'long') else [mins(s) for s in x['lay'].split('+')]
     lays = [v for v in lays if v is not None]
     rid = re.sub(r'[^a-z0-9]+', '-', f"{x['d']}-{x['dest']}-{x['dep']}-{x['arr']}-{al}".lower())
-    nd = x['dep'] + x['dur'] + TZ_DIFF >= 1440
+    nd = (x['dep'] + x['dur'] + TZ_DIFF) // 1440   # days after departure the flight lands (2 on some long-haul trips, -1 westbound over the date line)
     items.append(dict(x=x, e=e, rid=rid, al=al, via=via, lays=lays, nd=nd, notes=notes, fare=fare, sw=sw, ua_sold=ua_sold))
 def worse(a, b):  # b makes a pointless: leaves within an hour, no slower, no more stops, no dearer in any economy price
     A, B = a['x'], b['x']
@@ -55,8 +55,8 @@ if os.path.exists('page-rows.json'):   # keep ids stable across re-runs, so like
 rows = []
 for it in items:
     x, e = it['x'], it['e']
-    rid = old_ids.get((int(x['d']), x['dest'], x['dep'], x['arr'] + (1440 if it['nd'] else 0)), it['rid'])
-    rows.append([rid, int(x['d']), x['dest'], x['dep'], x['arr'] + (1440 if it['nd'] else 0), x['dur'], x['stops'],
+    rid = old_ids.get((int(x['d']), x['dest'], x['dep'], x['arr'] + 1440 * it['nd']), it['rid'])
+    rows.append([rid, int(x['d']), x['dest'], x['dep'], x['arr'] + 1440 * it['nd'], x['dur'], x['stops'],
                  it['via'], it['lays'], it['al'], x['flights'], e['cash'], it['fare'],
                  e['dl'], e['sw'], e['swc'], e['aa'], e['ua'], it['sw'].get('cashBasic'), it['sw'].get('cashChoice'),
                  '; '.join(it['notes']), 1 if any(worse(it, o) for o in items) else 0, 1 if it['ua_sold'] else 0, x.get('legs') or [],

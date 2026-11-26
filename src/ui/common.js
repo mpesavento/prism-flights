@@ -143,9 +143,11 @@ window.addEventListener("scroll", () => Tip.hide(), {passive: true});
 // Airline pills: logo, points, confirmed credit; a red line when credit expires within 6 months; hover or tap for the breakdown
 const PILL_AL = [["Southwest", "sw", "pts"], ["Delta", "dl", "mi"], ["American", "aa", "mi"], ["United", "ua", "mi"], ["Alaska", "as", "pts"]];
 function monthsLeft(iso) { const d = (new Date(iso + "T12:00:00") - new Date()) / 864e5; return d < 45 ? Math.max(0, Math.round(d)) + " days" : Math.round(d / 30.4) + "mo"; }
-function airlinePills(balances, cv, values, only) {
+// progs (optional): [[name, key, unit]] for every program in the wallet; ones not in PILL_AL (Chase, other banks) are added after the airlines
+function airlinePills(balances, cv, values, only, progs) {
   const V = (values || {}).cents || {}, src = (values || {}).source || "";
-  return '<div class="pills">' + PILL_AL.filter(([a]) => !only || only.includes(a)).map(([a, p, u]) => {
+  const AL = PILL_AL.concat((progs || []).filter(([a]) => !PILL_AL.some(([b]) => b == a)));
+  return '<div class="pills">' + AL.filter(([a]) => !only || only.includes(a)).map(([a, p, u]) => {
     const b = (balances || {})[p], c = (cv || {})[a]; if (b == null && !c) return "";
     const worth = b != null && V[p] ? b * V[p] / 100 : null;
     let tip = "<b>" + esc(a) + "</b>" + (b != null ? "<div>" + b.toLocaleString() + " " + u + (worth ? ' <span class="eqc">(~' + money(worth) + " at " + V[p] + "¢)</span>" : "") + "</div>" : "");

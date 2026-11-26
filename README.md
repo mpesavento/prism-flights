@@ -61,6 +61,41 @@ python3 ../../../pipeline/nws.py 2027-03-12,2027-03-13 ORD,DEN   # optional weat
 
 Then `python3 src/build_portal.py` builds the pages into `site/`.
 
+### Raw cash rows (any source)
+
+`merge.py` reads every `cash-*.txt` in the search folder (or in `raw/`), one flight per line, `|`-separated:
+
+```
+day|dest|dep|arr|airline|stops|via|layovers|duration|price|fare
+15|SAN|4:35 pm|6:10 pm|Frontier Airlines|Nonstop|||1h 35m|64|Basic
+26|HAN|11:45 am|9:45 pm|Korean Air|1 stop|ICN|65m|19h 0m|1024|
+```
+
+`day` is the day of the month; times are local, 12-hour; `via` is a comma list of connection airports, `layovers` a
+comma list of minutes (`65m,120m`); `duration` is `Xh Ym` (hours may exceed 24); `price` is whole dollars. Anything
+that can write these lines (a fare API, a saved Google Flights page) can feed the pages; the award files
+(`dl-`, `wn-`, `ua-`, `aa-`) are separate and optional.
+
+### International and long-haul trips
+
+The defaults suit US domestic one-ways: red-eyes are dropped, trips over 14 hours are dropped and the page opens with
+an 11-hour duration filter. For long-haul trips, set these in `trip.json`:
+
+| Key | Default | Effect |
+|---|---|---|
+| `drop_redeyes` | `true` | `false` keeps overnight flights |
+| `max_hours` | `14` | longest trip kept by `merge.py` |
+| `dur_default_hours` | `11` | the page's starting duration filter |
+| `tz_diff` | `180` | minutes the destination clock is ahead of the origin (SFO to Hanoi is 900; negative westbound) |
+
+Arrivals two days later show as `+2`, and westbound arrivals on the previous date as `−1`.
+
+### Bank points
+
+Any program in `wallet.json` gets a balance pill, not only the five airlines: Chase, Amex, Citi, Capital One and Bilt
+have short keys, and other names get one made from the name. Add a cents value for the key in `src/point_values.json`
+to show what the points are worth.
+
 ## Settings
 
 Copy `config.example.json` to `config.local.json` (ignored by git) and fill in only what you use. With no settings

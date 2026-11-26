@@ -15,7 +15,7 @@ const SIX = 183, YEAR = 365, ALL = "credits:all";
 const zone = n => n == null ? "good" : n < 0 ? "exp" : n <= SIX ? "bad" : n <= YEAR ? "warn" : "good";
 const live = c => { const n = daysTo(c.useBy); return n == null || n >= 0; };  // expired credits are not money
 const leftTxt = n => n == null ? "no end date" : n < 0 ? "expired" : n == 0 ? "last day" : n < 45 || (n >= 152 && n <= 214) ? n + " days left" : Math.round(n / 30.4) + "mo left";  // days near the 6-month line, so 183 (red) and 184 (amber) never both read "6mo"
-const BALKEY = {Delta: "dl", Southwest: "sw", American: "aa", United: "ua", Alaska: "as"};
+const BALKEY = Object.assign({Delta: "dl", Southwest: "sw", American: "aa", United: "ua", Alaska: "as"}, H.balKeys || {});
 const CENTS = (H.values || {}).cents || {};
 const money0 = n => money(Math.round(n));
 
@@ -50,7 +50,7 @@ function liveCv() {
   }
   return by;
 }
-function renderPills() { $("pills").innerHTML = airlinePills(H.balances, liveCv(), H.values); }
+function renderPills() { $("pills").innerHTML = airlinePills(H.balances, liveCv(), H.values, null, H.pillProgs); }
 
 // ---- Recheck controls: one look everywhere (per credit, per balance, all). Drafts until Submit.
 function chkCtl(item, label) {

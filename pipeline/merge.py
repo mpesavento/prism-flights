@@ -11,6 +11,9 @@ glob.glob = lambda pat: sorted(set(_glob(pat) + _glob(os.path.join('raw', pat)))
 TZ_DIFF = int(TRIP.get('tz_diff', 180))
 SKIP = TRIP.get('skip_airlines', [])
 LATEST_DEP, LATEST_NEXTDAY_ARR, MAX_DUR = 20*60, 3*60, 14*60
+# International trips: trip.json "drop_redeyes": false keeps overnight flights, "max_hours": 30 raises the duration cap
+DROP_REDEYES = TRIP.get('drop_redeyes', True)
+MAX_DUR = int(float(TRIP.get('max_hours', MAX_DUR / 60)) * 60)
 def load(f):
     s = open(f).read()
     try: s = json.loads(s)
@@ -159,7 +162,7 @@ for it in IT.values():
     arrPT = it['dep'] + it['dur']; nextday = it['dur'] > 0 and (arrPT + TZ_DIFF) >= 1440
     it['nextday'] = nextday
     # red-eye / overnight: leaves 8pm PT or later, or lands next day at 3am ET or later
-    if it['dep'] >= LATEST_DEP or (nextday and it['arr'] >= LATEST_NEXTDAY_ARR): continue
+    if DROP_REDEYES and (it['dep'] >= LATEST_DEP or (nextday and it['arr'] >= LATEST_NEXTDAY_ARR)): continue
     if it['dur'] > MAX_DUR or it['dur'] == 0: continue
     if nextday: it['notes'].add('lands after midnight')
     if it['airlines'] & {'Frontier', 'Spirit'}: it['notes'].add('Low-cost airline: bags and seats extra')

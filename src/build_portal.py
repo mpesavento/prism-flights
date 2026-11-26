@@ -25,7 +25,12 @@ CSS, COMMON = rd(os.path.join(UI, 'base.css')), rd(os.path.join(UI, 'common.js')
 LOGOCSS = ''.join('.L-%s{background-image:url(%s)}\n' % (k, v) for k, v in LOGOS.items())
 CITY = {"ATL": "Atlanta", "AUS": "Austin", "BNA": "Nashville", "CLT": "Charlotte", "DAL": "Dallas Love Field", "DEN": "Denver", "DFW": "Dallas Fort Worth", "EWR": "Newark", "HOU": "Houston Hobby", "IAD": "Washington Dulles", "IAH": "Houston Bush", "LAS": "Las Vegas", "LAX": "Los Angeles", "MDW": "Chicago Midway", "MSP": "Minneapolis", "ORD": "Chicago O'Hare", "PHX": "Phoenix", "SAN": "San Diego", "SEA": "Seattle", "SFO": "San Francisco", "SLC": "Salt Lake City", "PDX": "Portland", "BWI": "Baltimore", "MCO": "Orlando", "JFK": "New York JFK", "LGA": "New York LaGuardia", "BOS": "Boston", "PHL": "Philadelphia", "DTW": "Detroit", "ONT": "Ontario", "BUR": "Burbank", "SNA": "Orange County", "SMF": "Sacramento", "LGB": "Long Beach", "STL": "St. Louis", "MCI": "Kansas City", "MSY": "New Orleans", "TPA": "Tampa", "RDU": "Raleigh-Durham", "PIT": "Pittsburgh", "CVG": "Cincinnati", "IND": "Indianapolis", "CMH": "Columbus", "SAT": "San Antonio", "ELP": "El Paso", "ABQ": "Albuquerque", "OKC": "Oklahoma City", "MEM": "Memphis", "BHM": "Birmingham", "JAX": "Jacksonville", "RSW": "Fort Myers", "SJU": "San Juan", "ORF": "Norfolk", "CLE": "Cleveland", "MKE": "Milwaukee", "OAK": "Oakland", "SJC": "San Jose"}
 PROGS = {'dl': ([13], 'DL'), 'sw': ([14, 15], 'WN'), 'aa': ([16], 'AA'), 'ua': ([17], 'UA')}
-BAL_KEY = {'Delta': 'dl', 'Southwest': 'sw', 'American': 'aa', 'United': 'ua', 'Alaska': 'as'}
+BAL_KEY = {'Delta': 'dl', 'Southwest': 'sw', 'American': 'aa', 'United': 'ua', 'Alaska': 'as',
+           'Chase': 'ur', 'Amex': 'mr', 'Citi': 'ty', 'Capital One': 'c1', 'Bilt': 'bilt'}
+balkey = lambda name: BAL_KEY.get(name) or re.sub(r'[^a-z0-9]', '', name.lower())   # any other program in wallet.json gets a key from its name
+# pills for every program in wallet.json: [name, key, short unit]; airlines first in the page's own order, then banks and others
+pill_progs = lambda wallet: [[p['airline'], balkey(p['airline']), 'mi' if p.get('unit', '').startswith('mile') else 'pts'] for p in wallet['programs']]
+DUR_DEFAULT = 11 * 60   # the trip page's default duration filter, in minutes; trip.json dur_default_hours changes it
 COLS = ['id', 'day', 'dest', 'dep_min_origin_time', 'arr_min_dest_time_plus1440_next_day', 'duration_min', 'stops', 'via', 'layover_mins', 'airlines', 'flights', 'cash_lowest', 'cash_fare_source', 'delta_main_miles', 'sw_basic_pts', 'sw_choice_pts', 'aa_main_miles', 'ua_economy_miles', 'sw_cash_basic', 'sw_cash_choice', 'notes', 'similar_folded', 'ua_award_sold_out', 'legs', 'origin', 'fares[airline,class,tier,cash,points,program,award_tax,[[points,cash]],note]']
 VALUES = json.load(open(os.path.join(SRC, 'point_values.json')))
 ASSETS = os.path.join(SRC, 'assets')
@@ -101,15 +106,16 @@ def trip_data(tdir, wallet, flags):
     dayd = {str(int(d[-2:])): d for d in dates}
     days = {k: dt.date.fromisoformat(v).strftime('%a %b %-d') for k, v in dayd.items()}
     vias = {v for r in rows for v in r[7]}
-    bal = {BAL_KEY[p['airline']]: p['balance'] for p in wallet['programs'] if p['airline'] in BAL_KEY}
+    bal = {balkey(p['airline']): p['balance'] for p in wallet['programs']}
+    dur_default = int(float(t.get('dur_default_hours', DUR_DEFAULT / 60)) * 60)
     return t, rows, dict(slug=t['slug'], title=t['title'], short=t['short'], scope=t.get('scope', ''), searched=t['searched'], searchedLabel=t.get('searched_label', ''),
         days=days, daysShort=days, dayDates=dayd, destNames=t['dest_names'], destDefault=t.get('dest_default', list(t['dest_names'])),
         tzOrigin=t.get('tz_origin', 'PT'), tzDest=t.get('tz_dest', 'ET'), originName=t.get('origin_name', t.get('origin', '')), destRegion=t.get('dest_region', 'destination'),
         origins={k: v['name'] for k, v in origins.items()}, dates=dates,
-        city={v: CITY.get(v, v) for v in vias}, wx=weather_badges(tdir, set(dates)), held=t.get('held'), credits=credit_view(wallet, flags), balances=bal, values=VALUES, fromDefault=t.get('from_default'), why=t.get('why', ''), rows=rows)
+        city={v: CITY.get(v, v) for v in vias}, wx=weather_badges(tdir, set(dates)), held=t.get('held'), credits=credit_view(wallet, flags), balances=bal, pillProgs=pill_progs(wallet), durDefault=dur_default, values=VALUES, fromDefault=t.get('from_default'), why=t.get('why', ''), rows=rows)
 
-def picks(rows, cv, days, tzo, dest_default=None, slug='', from_default=None):
-    rows = [r for r in rows if not r[21] and (not dest_default or r[2] in dest_default) and (not from_default or r[24] in from_default) and r[5] <= 660] or rows
+def picks(rows, cv, days, tzo, dest_default=None, slug='', from_default=None, dur_default=DUR_DEFAULT):
+    rows = [r for r in rows if not r[21] and (not dest_default or r[2] in dest_default) and (not from_default or r[24] in from_default) and r[5] <= dur_default] or rows
     def miles(r):
         best = None
         for p, (cols, code) in PROGS.items():
@@ -162,7 +168,7 @@ def main():
         last = max(t['dates'])
         h = t.get('held')
         trips.append(dict(slug=t['slug'], name=t.get('card_name', t['short']), route=t.get('route', ''), count=len(rows), searched=t['searched'], searchedLabel=t.get('searched_label', ''),
-                          past=dt.date.fromisoformat(last) < today, picks=picks(rows, td['credits'], td['days'], td['tzOrigin'], td['destDefault'], t['slug'], t.get('from_default')),
+                          past=dt.date.fromisoformat(last) < today, picks=picks(rows, td['credits'], td['days'], td['tzOrigin'], td['destDefault'], t['slug'], t.get('from_default'), td['durDefault']),
                           held=(f"{h['flight']}, {td['days'].get(str(h['d']), '')} {tm(h['dep'])} {td['tzOrigin']}, ${h['price']:.2f}" if h else None),
                           airlines=sorted({r[9] for r in rows}), first=min(t['dates'])))
         print(f"built {os.path.relpath(SITE)}/{t['slug']}/index.html ({len(page):,} bytes, {len(rows)} flights)")
@@ -187,7 +193,7 @@ def main():
     home = dict(programs=[{k: p.get(k) for k in ('airline', 'program', 'unit', 'balance', 'balanceAsOf', 'expiry', 'creditsStatus')} for p in wallet['programs']], credits=creds,
                 trips=[{k: v for k, v in x.items() if k not in ('airlines', 'first')} for x in trips],
                 tracking=dict(version=track['tracker_version'], airlines=sorted(track['airlines']), needScan=need, scanDate=', '.join(scan)))
-    home.update(cv=credit_view(wallet, flags), balances={BAL_KEY[p['airline']]: p['balance'] for p in wallet['programs'] if p['airline'] in BAL_KEY}, values=VALUES,
+    home.update(cv=credit_view(wallet, flags), balances={balkey(p['airline']): p['balance'] for p in wallet['programs']}, pillProgs=pill_progs(wallet), balKeys={p['airline']: balkey(p['airline']) for p in wallet['programs']}, values=VALUES,
                 oldLinks=[{'text': str(l.get('text', '')), 'url': str(l.get('url', ''))} for l in portal_config.get('old_links', []) if isinstance(l, dict) and l.get('url')])
     page = fill(rd(os.path.join(UI, 'home.html')), {'<!--__UPDATED__-->': html.escape(wallet['asof']), '/*__PROV__*/': f'data/credits + data/searches built {now:%Y-%m-%d %H:%M} PT',
         '/*__CSS__*/': CSS, '/*__LOGOCSS__*/': LOGOCSS, '/*__LOGONAMES__*/[]': js(list(LOGOS)), '/*__DATA__*/null': js(home), '/*__COMMON__*/': COMMON, '/*__APP__*/': rd(os.path.join(UI, 'home.js')), '/*__ASKCSS__*/': opt('ask.css'), '/*__ASKJS__*/': opt('ask.js'), '<!--__HERO__-->': HERO, '<!--__FAVICON__-->': FAVICON})

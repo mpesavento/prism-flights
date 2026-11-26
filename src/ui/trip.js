@@ -14,7 +14,7 @@ const VIAS = [...new Set(R.flatMap(r => r[C.via]))];
 const ALS = [...new Set(R.map(r => r[C.al]))];
 const span = (vals, step) => { const a = vals.filter(v => v != null); return [Math.floor(Math.min(...a) / step) * step, Math.ceil(Math.max(...a) / step) * step]; };
 const RG = {cash: span(R.map(r => r[C.cash]), 10), miles: span(R.flatMap(r => [r[C.dl], r[C.sw], r[C.swc], r[C.aa], r[C.ua]]), 500), dep: span(R.map(r => r[C.dep]), 15), arr: span(R.map(r => r[C.arr]), 15), lay: span(R.flatMap(r => r[C.lays]), 5), dur: span(R.map(r => r[C.dur]), 15)};
-const DEF = () => ({from: T.fromDefault && T.fromDefault.length ? [...T.fromDefault] : [...ORGS], days: [...DAYS], to: [...T.destDefault], stops: "any", xconn: [], unl: true, lay: [RG.lay[0], RG.lay[1]], pay: "any", cash: RG.cash[1], miles: RG.miles[1], dep: [RG.dep[0], RG.dep[1]], arr: [RG.arr[0], RG.arr[1]], dur: Math.min(660, RG.dur[1]), xal: [], sort: "dur", liked: false, hid: false, similar: false, allFares: false, q: null});
+const DEF = () => ({from: T.fromDefault && T.fromDefault.length ? [...T.fromDefault] : [...ORGS], days: [...DAYS], to: [...T.destDefault], stops: "any", xconn: [], unl: true, lay: [RG.lay[0], RG.lay[1]], pay: "any", cash: RG.cash[1], miles: RG.miles[1], dep: [RG.dep[0], RG.dep[1]], arr: [RG.arr[0], RG.arr[1]], dur: Math.min(T.durDefault || 660, RG.dur[1]), xal: [], sort: "dur", liked: false, hid: false, similar: false, allFares: false, q: null});
 let F = DEF();
 const lowP = (r, p) => { for (const i of PROG[p].cols) if (r[i] != null) return r[i]; return null; };
 function milesOf(r, pay) { if (PROG[pay]) { const v = lowP(r, pay); return v == null ? null : {v, p: pay}; } let b = null; for (const p in PROG) { const v = lowP(r, p); if (v != null && (!b || v < b.v)) b = {v, p}; } return b; }
@@ -22,6 +22,7 @@ const CASHCAP = (() => { const c = R.map(r => r[C.cash]).filter(v => v != null).
 const cpm = r => { if (r[C.cash] == null || r[C.cash] > CASHCAP) return null; const m = milesOf(r, F.pay); return m ? r[C.cash] / m.v * 100 : null; };
 const viaUnl = r => r[C.via].length < r[C.st];
 const nextDay = r => r[C.arr] >= 1440;
+const dayMark = r => { const n = Math.floor(r[C.arr] / 1440); return n > 0 ? "+" + n : n < 0 ? "\u2212" + (-n) : ""; };   // +1, +2, or -1 (westbound over the date line)
 function credit(r) { const c = T.credits[r[C.al]]; if (!c || r[C.cash] == null || !c.sure) return null; const used = Math.min(c.sure, r[C.cash]); return {after: r[C.cash] - used, used, c}; }
 const newMoney = r => { const c = credit(r); return c ? c.after : r[C.cash]; };
 function passes(r, skip) {
@@ -63,7 +64,7 @@ function renderTop() {
   const rb = $("rerun"); if (rb) { const it = "rerun:" + T.slug, p = Requests.pendingFor(it); rb.textContent = p ? "Re-run requested" : (Requests.has(it) ? "Re-run queued (undo)" : "Request a re-run"); rb.onclick = () => { if (!p) { Requests.toggle(it, "re-run " + T.short); renderTop(); } }; }
   const h = T.held;
   $("held").innerHTML = h ? '<div class="heldl">' + logoTile(h.airline, 1) + '<span>You hold <b>' + esc(h.flight) + "</b> from " + esc(h.fromName) + ", " + esc(T.daysShort[h.d] || "") + " " + tm(h.dep) + " → " + tm(h.arr) + " " + T.tzDest + ", " + money(h.price) + '. <span class="mu">Prices below compare to it.</span></span></div>' : "";
-  $("pills").innerHTML = airlinePills(T.balances, T.credits, T.values);
+  $("pills").innerHTML = airlinePills(T.balances, T.credits, T.values, null, T.pillProgs);
   renderSeg();
 }
 function renderSeg() {
@@ -148,7 +149,7 @@ function openSheet(k, anchor) {
   } else if (k == "times") {
     b.innerHTML = '<div id="tD"></div><div class="quick" data-tq="dep"></div><div id="tA"></div><div class="quick" data-tq="arr"></div>';
     ranges.dep = makeRange($("tD"), {label: "Leave " + (MULTI ? "the Bay Area" : T.originName) + " (" + T.tzOrigin + ")", min: RG.dep[0], max: RG.dep[1], step: 15, dual: true, fmt: tm, any: "Any time", value: F.dep}, () => { const v = ranges.dep.get(); F.dep = [v.lo, v.hi]; changed(); });
-    ranges.arr = makeRange($("tA"), {label: "Land in " + T.destRegion + " (" + T.tzDest + ")", min: RG.arr[0], max: RG.arr[1], step: 15, dual: true, fmt: m => tm(m) + (m >= 1440 ? " next day" : ""), any: "Any time", value: F.arr}, () => { const v = ranges.arr.get(); F.arr = [v.lo, v.hi]; changed(); });
+    ranges.arr = makeRange($("tA"), {label: "Land in " + T.destRegion + " (" + T.tzDest + ")", min: RG.arr[0], max: RG.arr[1], step: 15, dual: true, fmt: m => tm(m) + (m >= 2880 ? " (+" + Math.floor(m / 1440) + " days)" : m >= 1440 ? " next day" : ""), any: "Any time", value: F.arr}, () => { const v = ranges.arr.get(); F.arr = [v.lo, v.hi]; changed(); });
     const q = (w, lab, lo, hi) => '<button class="btn sm" data-tw="' + w + '" data-lo="' + lo + '" data-hi="' + hi + '">' + lab + "</button>";
     b.querySelector('[data-tq="dep"]').innerHTML = q("dep", "Morning", RG.dep[0], 720) + q("dep", "Midday", 600, 900) + q("dep", "Any", RG.dep[0], RG.dep[1]);
     b.querySelector('[data-tq="arr"]').innerHTML = q("arr", "By 6pm", RG.arr[0], 1080) + q("arr", "By 9pm", RG.arr[0], 1260) + q("arr", "By midnight", RG.arr[0], 1440) + q("arr", "Any", RG.arr[0], RG.arr[1]);
@@ -348,7 +349,7 @@ function rowHTML(u) {
 }
 function cardHTML(u) {
   const r = u[0], ids = idsOf(u), {lk, hd} = marks(u), tw = u.length > 1, ch = cheapestOf(u);
-  return '<div id="r-' + esc(r[C.id]) + '" data-ids="' + esc(ids) + '" data-open tabindex="0" aria-label="' + esc(flightLabel(u)) + '" class="card box' + (tw ? " twin" : "") + (lk ? " liked" : "") + (hd ? " hid" : "") + (fpOn(u) ? " fpon" : "") + '"><div class="c1">' + logoTile(r[C.al]) + '<div class="cm"><div class="ct1">' + tm(r[C.dep]) + " <small>" + T.tzOrigin + "</small> → " + tm(r[C.arr]) + (nextDay(r) ? "+1" : "") + " <small>" + T.tzDest + '</small></div><div class="ct2">' + du(r[C.dur]) + " · " + stopsTxt(r) + " · " + layTxt(r) + "</div>" +
+  return '<div id="r-' + esc(r[C.id]) + '" data-ids="' + esc(ids) + '" data-open tabindex="0" aria-label="' + esc(flightLabel(u)) + '" class="card box' + (tw ? " twin" : "") + (lk ? " liked" : "") + (hd ? " hid" : "") + (fpOn(u) ? " fpon" : "") + '"><div class="c1">' + logoTile(r[C.al]) + '<div class="cm"><div class="ct1">' + tm(r[C.dep]) + " <small>" + T.tzOrigin + "</small> → " + tm(r[C.arr]) + dayMark(r) + " <small>" + T.tzDest + '</small></div><div class="ct2">' + du(r[C.dur]) + " · " + stopsTxt(r) + " · " + layTxt(r) + "</div>" +
     (ONE && !MULTI && !tw ? "" : '<div class="ct3">' + esc(tw ? u.map(dayShort).join(" + ") : T.daysShort[r[C.d]]) + " · " + (MULTI ? r[C.org] + " → " : "") + r[C.to] + "</div>") + "</div>" + open1 + "</div>" +
     '<div class="cc">' + rowFares(u) + "</div>" +
     '<div class="c2"><span class="mu">' + esc(r[C.al]) + (tw ? " · book " + esc(dayShort(ch)) : "") + '</span><span class="sp"></span>' + bookBtn(ch) + likeHide(ids, lk, hd) + "</div></div>";
@@ -499,7 +500,7 @@ function panelFoot(u) {
 function paintPanelHead() {
   const u = rowsOf(FP.ids); if (!u.length) return; const r = u[0], {lk, hd} = marks(u);
   $("fpSub").textContent = u.map(x => T.daysShort[x[C.d]]).join(" and ") + " · " + place(r[C.org]) + " → " + place(r[C.to]);
-  $("fpT").innerHTML = tm(r[C.dep]) + " <small>" + T.tzOrigin + "</small> → " + tm(r[C.arr]) + (nextDay(r) ? "+1" : "") + " <small>" + T.tzDest + "</small>";
+  $("fpT").innerHTML = tm(r[C.dep]) + " <small>" + T.tzOrigin + "</small> → " + tm(r[C.arr]) + dayMark(r) + " <small>" + T.tzDest + "</small>";
   $("fpLH").innerHTML = likeHide(idsOf(u), lk, hd);
 }
 function markOpenRow() { document.querySelectorAll("#list .fpon").forEach(e => e.classList.remove("fpon")); if (FP.open) { const el = unitEl(FP.ids[0]); if (el) el.classList.add("fpon"); } }
@@ -534,7 +535,7 @@ function cmpRows() {
   return [
     ["Day", r => ({h: esc(T.daysShort[r[C.d]])}), null],
     ["Depart", r => ({h: "<b>" + tm(r[C.dep]) + "</b> " + T.tzOrigin + '<div class="mu">' + esc(place(r[C.org])) + "</div>"}), null],
-    ["Arrive", r => ({v: dayIdx(r) * 1440 + r[C.arr], h: "<b>" + tm(r[C.arr]) + (nextDay(r) ? "+1" : "") + "</b> " + T.tzDest + '<div class="mu">' + esc(place(r[C.to])) + "</div>"}), "lo"],
+    ["Arrive", r => ({v: dayIdx(r) * 1440 + r[C.arr], h: "<b>" + tm(r[C.arr]) + dayMark(r) + "</b> " + T.tzDest + '<div class="mu">' + esc(place(r[C.to])) + "</div>"}), "lo"],
     ["Total time", r => ({v: r[C.dur], h: "<b>" + du(r[C.dur]) + "</b>"}), "lo"],
     ["Stops and layovers", r => ({v: r[C.st], h: stopsTxt(r) + '<div class="mu">' + layTxt(r) + "</div>"}), "lo"],
     ["Cheapest cash", r => { const c = credit(r); return {v: r[C.cash], h: r[C.cash] != null ? "<b>" + money(r[C.cash]) + "</b>" + (c && c.used ? '<div class="mu">' + money(c.after) + " after credits</div>" : "") : '<span class="mu">none</span>'}; }, "lo"],
