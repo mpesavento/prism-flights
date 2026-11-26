@@ -142,6 +142,9 @@ function renderTimeline() {
     h += '<button class="xm z-' + g.z + (g.fl ? " fl" : "") + '" style="left:' + Math.round(g.L + 4) + "px;top:" + Math.round(y - g.d / 2) + 'px" data-go="' + esc(keys) + '" data-tiph="' + esc(g.tip) + '" aria-label="' + esc(aria) + '">' +
       '<span class="xd' + (g.solid ? "" : " dash") + '" style="width:' + g.d + "px;height:" + g.d + 'px">' + (LOGOS.has(g.airline) ? '<span class="li L-' + logoCls(g.airline) + '"></span>' : "") + '</span><span class="xl">' + esc(g.label) + "</span></button>";
   }
+  // credits with no end date are not on the line; name them under it
+  const open = credits.filter(c => !c.useBy);
+  if (open.length) h += '</div><div class="mu" style="padding:0 ' + pad + 'px 8px">No end date: ' + open.map(c => esc(c.airline) + " " + amt(c) + " " + esc(c.what.toLowerCase())).join(", ") + ".";
   host.innerHTML = h + "</div>";
 }
 

@@ -95,7 +95,7 @@ def credit_view(wallet, flags):
             if not a['soonDate'] or c['useBy'] < a['soonDate']: a['soonDate'] = c['useBy']
         if c.get('amount') is not None and k not in fl:
             a['sure'] += c['amount']
-            if not a['next'] or c['useBy'] < a['next']: a['next'] = c['useBy']
+            if c.get('useBy') and (not a['next'] or c['useBy'] < a['next']): a['next'] = c['useBy']   # credits with no end date (useBy null) never set it
         elif c.get('amount') is not None or c.get('original'):
             a['unsure'] += c.get('amount') or c.get('original') or 0
     for a in by.values():
@@ -199,7 +199,7 @@ def main():
         if use:
             others = [al for al in use['airlines'] if al != c['airline']]
             href = f"/flights/{use['slug']}/#v=" + json.dumps({'xal': others, 'pay': 'cash', 'sort': 'new'}, separators=(',', ':')).replace('"', '%22').replace('{', '%7B').replace('}', '%7D').replace('[', '%5B').replace(']', '%5D').replace(',', '%2C').replace(':', '%3A')
-        creds.append(dict(key=k, airline=c['airline'], what=c['what'], amount=c.get('amount'), original=c.get('original'), miles=c.get('miles'), useBy=c['useBy'], useByLabel=c.get('useByLabel'),
+        creds.append(dict(key=k, airline=c['airline'], what=c['what'], amount=c.get('amount'), original=c.get('original'), miles=c.get('miles'), useBy=c.get('useBy'), useByLabel=c.get('useByLabel'),
                           note=c.get('note'), **{'from': c.get('from')}, flag=fl.get(k, {}).get('reason'), checked=checked, useHref=href))
     need = [a for a, v in track['airlines'].items() if not v.get('email_backfill')]
     scan = sorted({v['email_backfill']['done'] for v in track['airlines'].values() if v.get('email_backfill')})

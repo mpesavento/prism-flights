@@ -46,7 +46,7 @@ def save(p, obj):
     os.replace(tmp, p)
 
 def credit_key(c):
-    base = '-'.join([c['airline'], c['what'], c['useBy'], str(c.get('amount') if c.get('amount') is not None else c.get('original') or c.get('miles') or '')])
+    base = '-'.join([c['airline'], c['what'], c.get('useBy') or 'none', str(c.get('amount') if c.get('amount') is not None else c.get('original') or c.get('miles') or '')])
     return re.sub(r'[^a-z0-9]+', '-', base.lower()).strip('-')
 
 def parse_asof(s):
@@ -76,7 +76,7 @@ def cmd_record():
             k = credit_key(c)
             while k in keys: k += '-b'
             keys.add(k)
-            rows.append(dict(kind='credit', checked_at=when, tracker_version=ver, airline=c['airline'], key=k, what=c['what'], amount=c.get('amount'), original=c.get('original'), miles=c.get('miles'), use_by=c['useBy'], use_by_label=c.get('useByLabel'), came_from=c.get('from'), note=c.get('note'), source=src))
+            rows.append(dict(kind='credit', checked_at=when, tracker_version=ver, airline=c['airline'], key=k, what=c['what'], amount=c.get('amount'), original=c.get('original'), miles=c.get('miles'), use_by=c.get('useBy'), use_by_label=c.get('useByLabel'), came_from=c.get('from'), note=c.get('note'), source=src))
         a = track['airlines'].setdefault(p['airline'], dict(tracked_since=when[:10], email_backfill=None))
         if p.get('creditsStatus') != 'unchecked':
             a['last_live_check'] = when
@@ -98,9 +98,9 @@ def write_snapshot(w, track, when):
     for p in w['programs']:
         lines.append(f"| {p['airline']} | {p['program']} | {p['balance']:,} {p['unit']} | {'not checked' if p.get('creditsStatus') == 'unchecked' else p.get('balanceAsOf', '')} |")
     lines += ['', '| Airline | Credit | Amount | Use by | Where it came from |', '|---|---|---|---|---|']
-    for c in sorted(w['credits'], key=lambda c: c['useBy']):
+    for c in sorted(w['credits'], key=lambda c: c.get('useBy') or '9999'):
         amt = f"${c['amount']:,.2f}" if c.get('amount') is not None else (f"{c['miles']:,} miles off an award" if c.get('miles') else f"up to ${c.get('original', 0):,.2f} (usable amount at checkout)")
-        lines.append(f"| {c['airline']} | {c['what']} | {amt} | {c.get('useByLabel', 'Use by')} {c['useBy']} | {c.get('from', '')} |")
+        lines.append(f"| {c['airline']} | {c['what']} | {amt} | {c.get('useByLabel', 'Use by') + ' ' + c['useBy'] if c.get('useBy') else 'No end date'} | {c.get('from', '')} |")
     none = [p['airline'] for p in w['programs'] if p.get('creditsStatus') != 'unchecked' and not any(c['airline'] == p['airline'] for c in w['credits'])]
     if none: lines += ['', f"No credits at: {', '.join(none)}."]
     lines += ['', 'Confirmation numbers, PINs and account numbers are deliberately left out.', '', '---', f"_Claude flights portal · {t:%Y-%m-%d} · source: data/credits/ledger.jsonl_"]
