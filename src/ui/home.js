@@ -84,18 +84,17 @@ const textW = (() => { let c; return (t, font) => { c = c || document.createElem
 function tlGroups() {
   const gs = [];
   for (const c of credits) {
-    if (!c.useBy) continue;
-    let g = gs.find(x => x.date == c.useBy && x.airline == c.airline);
-    if (!g) gs.push(g = {date: c.useBy, airline: c.airline, n: daysTo(c.useBy), list: [], sure: 0, upto: 0, miles: 0});
+    let g = gs.find(x => x.date == c.useBy && x.airline == c.airline);   // no end date (useBy null): grouped per airline, drawn in the column at the right
+    if (!g) gs.push(g = {date: c.useBy, open: !c.useBy, airline: c.airline, n: c.useBy ? daysTo(c.useBy) : null, list: [], sure: 0, upto: 0, miles: 0});
     g.list.push(c);
     if (c.amount != null && !c.flag) g.sure += c.amount; else if (c.amount != null || c.original) g.upto += c.amount != null ? c.amount : c.original; else if (c.miles) g.miles += c.miles;
   }
   for (const g of gs) {
     g.val = g.sure + g.upto + g.miles * (CENTS[BALKEY[g.airline]] || 1) / 100;
     g.label = g.sure ? money0(g.sure) + (g.upto ? " + up to " + money0(g.upto) : "") : g.upto ? "up to " + money0(g.upto) : g.miles ? kfmt(g.miles) + " mi off" : "";
-    g.z = zone(g.n); g.solid = g.sure > 0;
+    g.z = g.open ? "good" : zone(g.n); g.solid = g.sure > 0;
     g.tip = "<b>" + esc(g.airline) + "</b>" + g.list.map(c => "<div>" + amt(c) + " " + esc(c.what.toLowerCase()) + (c.flag ? " · may be used (check)" : "") + "</div>").join("") +
-      '<div class="' + (g.z == "bad" || g.z == "exp" ? "badt" : "") + '">' + esc((g.list[0].useByLabel || "Use by").toLowerCase()) + " " + fmtD(g.date) + (g.n < 0 ? " (expired)" : " (" + monthsLeft(g.date) + ")") + "</div>";
+      (g.open ? "<div>No end date</div>" : '<div class="' + (g.z == "bad" || g.z == "exp" ? "badt" : "") + '">' + esc((g.list[0].useByLabel || "Use by").toLowerCase()) + " " + fmtD(g.date) + (g.n < 0 ? " (expired)" : " (" + monthsLeft(g.date) + ")") + "</div>");
   }
   return gs.sort((a, b) => a.n - b.n || b.val - a.val);
 }
@@ -104,14 +103,15 @@ function renderTimeline() {
   const host = $("xt"), gs = tlGroups();
   if (!gs.length) { host.style.display = "none"; return; }
   host.style.display = "";
-  const W = tlW = host.clientWidth || 360, pad = 16, span = Math.max(YEAR, Math.max(...gs.map(g => g.n)) + 20), inner = W - 2 * pad;
+  const hasOpen = gs.some(g => g.open), dated = gs.filter(g => !g.open), col = hasOpen ? 96 : 0;
+  const W = tlW = host.clientWidth || 360, pad = 16, span = Math.max(YEAR, ...dated.map(g => g.n + 20)), inner = W - 2 * pad - col;
   const x = n => pad + Math.max(0, Math.min(1, n / span)) * inner;
   const maxV = Math.max(...gs.map(g => g.val), 1), font = "700 12.5px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
   const lanes = [];
   for (const g of gs) {
-    g.d = Math.round(22 + 14 * Math.sqrt(g.val / maxV)); g.cx = Math.max(x(g.n), g.d / 2 + 6); g.lw = textW(g.label, font) + 10;
+    g.d = Math.round(22 + 14 * Math.sqrt(g.val / maxV)); g.cx = g.open ? W - pad - col / 2 - 10 : Math.max(x(g.n), g.d / 2 + 6); g.lw = textW(g.label, font) + 10;
     const r = g.d / 2 + 4; let L = g.cx - r, R = g.cx + r + 5 + g.lw; g.fl = false;
-    if (R > W - 4) { g.fl = true; L = g.cx - r - 5 - g.lw; R = g.cx + r; }
+    if (R > W - 4 || (!g.open && hasOpen && R > W - pad - col)) { g.fl = true; L = g.cx - r - 5 - g.lw; R = g.cx + r; }
     let li = lanes.findIndex(lane => lane.every(([a, b]) => R + 4 <= a || L >= b + 4));
     if (li < 0) { lanes.push([]); li = lanes.length - 1; }
     lanes[li].push([L, R]); g.lane = li; g.L = L;
@@ -123,6 +123,7 @@ function renderTimeline() {
   const x6 = x(SIX), x12 = x(YEAR);
   h += '<div class="xz r" style="left:' + pad + "px;width:" + (x6 - pad) + "px;height:" + axisY + 'px"></div><div class="xz a" style="left:' + x6 + "px;width:" + (x12 - x6) + "px;height:" + axisY + 'px"></div>';
   h += '<div class="xzl t-bad" style="left:' + (pad + 7) + 'px">Under 6 months</div><div class="xzl t-warn" style="left:' + (x6 + 6) + 'px">6 to 12 months</div>';
+  if (hasOpen) h += '<div class="xz n" style="left:' + (W - pad - col + 6) + "px;width:" + (col - 6) + "px;height:" + axisY + 'px"></div><div class="xzl t-good" style="left:' + (W - pad - col + 12) + 'px">No end date</div>';
   h += '<div class="xa" style="left:' + pad + "px;width:" + inner + "px;top:" + axisY + 'px"></div><div class="xtd" style="left:' + pad + "px;height:" + (axisY + 6) + 'px"></div>';
   // month ticks
   h += '<div class="xk l" style="left:' + (pad - 1) + "px;top:" + (axisY + 8) + 'px">Today</div>';
@@ -142,9 +143,6 @@ function renderTimeline() {
     h += '<button class="xm z-' + g.z + (g.fl ? " fl" : "") + '" style="left:' + Math.round(g.L + 4) + "px;top:" + Math.round(y - g.d / 2) + 'px" data-go="' + esc(keys) + '" data-tiph="' + esc(g.tip) + '" aria-label="' + esc(aria) + '">' +
       '<span class="xd' + (g.solid ? "" : " dash") + '" style="width:' + g.d + "px;height:" + g.d + 'px">' + (LOGOS.has(g.airline) ? '<span class="li L-' + logoCls(g.airline) + '"></span>' : "") + '</span><span class="xl">' + esc(g.label) + "</span></button>";
   }
-  // credits with no end date are not on the line; name them under it
-  const open = credits.filter(c => !c.useBy);
-  if (open.length) h += '</div><div class="mu" style="padding:0 ' + pad + 'px 8px">No end date: ' + open.map(c => esc(c.airline) + " " + amt(c) + " " + esc(c.what.toLowerCase())).join(", ") + ".";
   host.innerHTML = h + "</div>";
 }
 
